@@ -7,7 +7,6 @@ app = Flask(__name__)
 CORS(app)
 
 POLYGON_API_KEY = "idl8QpvHV2xwBlK4g17LcPXkZXLbUtYE"
-
 def get_realtime_stock_data(ticker):
     """Fetch real-time stock data (1-minute interval for today)."""
     today = datetime.today().strftime("%Y-%m-%d")
