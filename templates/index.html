@@ -70,18 +70,22 @@
 
         <div class="stock-info" id="stock-details">
             <div class="info-box">
-                <strong>Stock Symbol:</strong> <span id="symbol">N/A</span><br>
-                <strong>Change:</strong> <span id="change">N/A</span> (<span id="percent-change">N/A%</span>)<br>
+                <strong>Ticker Code:</strong> <span id="ticker">N/A</span><br>
+                <strong>Date & Time:</strong> <span id="datetime">N/A</span>
             </div>
             <div class="info-box">
-                <strong>Day High:</strong> $<span id="high">N/A</span><br>
-                <strong>Day Low:</strong> $<span id="low">N/A</span>
+                <strong>Open Price:</strong> $<span id="open">N/A</span><br>
+                <strong>High Price:</strong> $<span id="high">N/A</span>
             </div>
             <div class="info-box">
-                <strong>Price:</strong> $<span id="price">N/A</span><br>
+                <strong>Low Price:</strong> $<span id="low">N/A</span><br>
+                <strong>Close Price:</strong> $<span id="close">N/A</span>
+            </div>
+            <div class="info-box">
                 <strong>Volume:</strong> <span id="volume">N/A</span>
             </div>
         </div>
+
 
         <div id="chartContainer"></div>
     </div>
@@ -116,13 +120,15 @@ function fetchStockData(ticker, duration) {
 
         updateStockDetails(data.meta, data.values[0]);
 
-        const dataPoints = data.values
-            .map(point => ({
-                x: new Date(point.datetime),
-                y: parseFloat(point.close),
-                volume: parseInt(point.volume)
-            }))
-            .reverse();
+        const dataPoints = data.values.map(point => ({
+            x: new Date(point.datetime),
+            y: parseFloat(point.close), 
+            open: parseFloat(point.open),
+            high: parseFloat(point.high),
+            low: parseFloat(point.low),
+            close: parseFloat(point.close),
+            volume: parseInt(point.volume)
+        })).reverse();
 
         // Filter out weekends only for intervals greater than 1D
         if (duration !== "5D") {
@@ -161,17 +167,19 @@ function renderChart(dataPoints, duration) {
         },
         axisY: { prefix: "$", labelFontColor: "#ffffff" },
         toolTip: {
-            shared: true,
-            contentFormatter: function(e) {
-                let date = e.entries[0].dataPoint.x;
-                let formattedDate = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        shared: true,
+        contentFormatter: function(e) {
+            if (e.entries.length > 0) {
+                let dataPoint = e.entries[0].dataPoint;
+                let dateTime = dataPoint.x.toLocaleString(); 
 
-                let content = `<strong>${formattedDate}</strong><br/>`;
-                e.entries.forEach(entry => {
-                    content += `Price: $${entry.dataPoint.y.toFixed(2)}<br/>`;
-                    content += `Volume: ${entry.dataPoint.volume.toLocaleString()}<br/>`;
-                });
-                return content;
+                document.getElementById("ticker").textContent = document.getElementById("stock-symbol").value.toUpperCase();
+                document.getElementById("datetime").textContent = dateTime;
+                document.getElementById("open").textContent = dataPoint.open.toFixed(2);
+                document.getElementById("high").textContent = dataPoint.high.toFixed(2);
+                document.getElementById("low").textContent = dataPoint.low.toFixed(2);
+                document.getElementById("close").textContent = dataPoint.close.toFixed(2);
+                document.getElementById("volume").textContent = dataPoint.volume.toLocaleString();
             }
         },
         data: [{
