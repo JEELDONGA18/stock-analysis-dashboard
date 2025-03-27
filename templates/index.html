@@ -88,6 +88,7 @@
 
 <script>
 let chart;
+const API_KEY = "a2b04bb31fbd4767afd5173564463359";
 
 document.getElementById("stockForm").addEventListener("submit", function(event) {
     event.preventDefault();
@@ -103,40 +104,40 @@ document.getElementById("stockForm").addEventListener("submit", function(event) 
 });
 
 function fetchStockData(ticker, duration) {
-    const url = duration === "1D" ? "/get_realtime_stock_data" : "/get_stock_data";
+    const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${getInterval(duration)}&apikey=${API_KEY}`;
 
-    fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker: ticker, duration: duration })
-    })
+    fetch(url)
     .then(response => response.json())
     .then(data => {
-        if (data.error) {
-            alert(data.error);
-            return;
-        }
-
-        updateStockDetails(data);
-
-        // Handle empty data case for both 1D and other durations
-        const dataPoints = data.data && data.data.length > 0 ? data.data.map(point => ({
-            x: new Date(point.x || point.timestamp),  // Ensure proper mapping of x or timestamp
-            y: point.y || point.price  // Ensure proper mapping of price or y
-        })) : [];
-
-        if (dataPoints.length === 0) {
+        if (!data.values) {
             alert("No data available for the selected duration.");
             return;
         }
+
+        updateStockDetails(data.meta);
+
+        const dataPoints = data.values.map(point => ({
+            x: new Date(point.datetime),
+            y: parseFloat(point.close)
+        })).reverse();
 
         renderChart(dataPoints, duration);
     })
     .catch(error => console.error("❌ Error fetching stock data:", error));
 }
 
+function getInterval(duration) {
+    return {
+        "7D": "30min",
+        "1M": "1day",
+        "6M": "1week",
+        "1Y": "15days",
+        "5Y": "1month"
+    }[duration];
+}
+
 function renderChart(dataPoints, duration) {
-    let color = dataPoints[0].y > dataPoints[dataPoints.length - 1].y ? "#FF0000" : "#00FF00";
+    let color = dataPoints[0].y < dataPoints[dataPoints.length - 1].y ? "#00FF00" : "#FF0000";
 
     chart = new CanvasJS.Chart("chartContainer", {
         backgroundColor: "#1e1e1e",
@@ -144,67 +145,28 @@ function renderChart(dataPoints, duration) {
         theme: "dark1",
         title: { text: "Stock Price Chart", fontColor: "white" },
         axisX: {
-            intervalType: duration === "1D" ? "minute" : (duration === "7D" ? "day" : "month"),
-            valueFormatString: duration === "1D" ? "HH:mm" : "MMM DD, YYYY",  // Adjust for time in 1D, date in others
+            intervalType: duration === "7D" ? "day" : "month",
+            valueFormatString: "MMM DD, YYYY",
             labelFontColor: "#ffffff",
             labelAngle: -20
         },
         axisY: { prefix: "$", labelFontColor: "#ffffff" },
-        toolTip: {
-            shared: true,
-            contentFormatter: function(e) {
-                let content = "<strong>" + e.entries[0].dataPoint.x + "</strong><br>";
-                e.entries.forEach(entry => {
-                    content += "<span style='color:" + entry.dataSeries.color + "'>" + entry.dataSeries.name + ": </span>" + entry.dataPoint.y + "<br>";
-                });
-                return content;
-            }
-        },
         data: [{
             type: "line",
             markerSize: 0,
             lineThickness: 2,
             color: color,
             dataPoints: dataPoints
-        }]
+        }],
+        creditText: ""
     });
-    credit: { enabled: false } 
     chart.render();
 }
 
-function updateStockDetails(data) {
-    document.getElementById("symbol").innerText = data.symbol || "N/A";
-    document.getElementById("change").innerText = data.change || "N/A";
-    document.getElementById("percent-change").innerText = (data.percent_change || "N/A") + "%";
-    document.getElementById("high").innerText = data.high || "N/A";
-    document.getElementById("low").innerText = data.low || "N/A";
-    document.getElementById("price").innerText = data.price || "N/A";
-    document.getElementById("volume").innerText = data.volume || "N/A";
+function updateStockDetails(meta) {
+    document.getElementById("symbol").innerText = meta.symbol || "N/A";
+    document.getElementById("price").innerText = meta.currency || "N/A";
 }
-
-function disable1dOptionIfDataUnavailable() {
-    const ticker = document.getElementById("stock-symbol").value.toUpperCase().trim();
-    if (ticker !== "") {
-        fetch("/get_realtime_stock_data", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ticker: ticker })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                document.getElementById("1d-option").disabled = true;  // Disable 1D option
-            }
-        })
-        .catch(() => {
-            document.getElementById("1d-option").disabled = true;  // Disable 1D option if error occurs
-        });
-    }
-}
-
-// Call the disable function on page load to check 1D data availability
-disable1dOptionIfDataUnavailable();
 </script>
-
 </body>
 </html>
