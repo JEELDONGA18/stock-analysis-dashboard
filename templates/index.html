@@ -59,7 +59,7 @@
         <form id="stockForm">
             <input type="text" id="stock-symbol" placeholder="Enter Stock Symbol" value="AAPL">
             <select id="period">
-                <option value="7D">7 Days</option>
+                <option value="5D">5 Days</option>
                 <option value="1M" selected>1 Month</option>
                 <option value="6M">6 Months</option>
                 <option value="1Y">1 Year</option>
@@ -88,7 +88,7 @@
 
 <script>
 let chart;
-const API_KEY = "a2b04bb31fbd4767afd5173564463359";
+const API_KEY = "e047e2c6b3104488a41cc3cb41f7fcd1";
 
 document.getElementById("stockForm").addEventListener("submit", function(event) {
     event.preventDefault();
@@ -104,22 +104,30 @@ document.getElementById("stockForm").addEventListener("submit", function(event) 
 });
 
 function fetchStockData(ticker, duration) {
-    const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${getInterval(duration)}&apikey=${API_KEY}`;
+    const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${getInterval(duration)}&apikey=${API_KEY}&outputsize=500`;
 
     fetch(url)
     .then(response => response.json())
     .then(data => {
-        if (!data.values) {
+        if (!data.values || data.values.length === 0) {
             alert("No data available for the selected duration.");
             return;
         }
 
-        updateStockDetails(data.meta);
+        updateStockDetails(data.meta, data.values[0]);
 
-        const dataPoints = data.values.map(point => ({
-            x: new Date(point.datetime),
-            y: parseFloat(point.close)
-        })).reverse();
+        const dataPoints = data.values
+            .map(point => ({
+                x: new Date(point.datetime),
+                y: parseFloat(point.close),
+                volume: parseInt(point.volume)
+            }))
+            .reverse();
+
+        // Filter out weekends only for intervals greater than 1D
+        if (duration !== "5D") {
+            dataPoints = dataPoints.filter(point => point.x.getDay() !== 0 && point.x.getDay() !== 6);
+        }
 
         renderChart(dataPoints, duration);
     })
@@ -128,7 +136,7 @@ function fetchStockData(ticker, duration) {
 
 function getInterval(duration) {
     return {
-        "7D": "30min",
+        "5D": "30min",
         "1M": "1day",
         "6M": "1week",
         "1Y": "15days",
@@ -137,7 +145,7 @@ function getInterval(duration) {
 }
 
 function renderChart(dataPoints, duration) {
-    let color = dataPoints[0].y < dataPoints[dataPoints.length - 1].y ? "#00FF00" : "#FF0000";
+    let color = dataPoints[0].y < dataPoints[dataPoints.length - 1].y ? "#FF0000" : "#00FF00";
 
     chart = new CanvasJS.Chart("chartContainer", {
         backgroundColor: "#1e1e1e",
@@ -145,12 +153,27 @@ function renderChart(dataPoints, duration) {
         theme: "dark1",
         title: { text: "Stock Price Chart", fontColor: "white" },
         axisX: {
-            intervalType: duration === "7D" ? "day" : "month",
-            valueFormatString: "MMM DD, YYYY",
+            interval: duration === "5D" ? 1 : "auto",
+            intervalType: duration === "5D" ? "hour" : "day",
+            valueFormatString: duration === "5D" ? "MMM DD HH:mm" : "MMM DD, YYYY",
             labelFontColor: "#ffffff",
             labelAngle: -20
         },
         axisY: { prefix: "$", labelFontColor: "#ffffff" },
+        toolTip: {
+            shared: true,
+            contentFormatter: function(e) {
+                let date = e.entries[0].dataPoint.x;
+                let formattedDate = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                let content = `<strong>${formattedDate}</strong><br/>`;
+                e.entries.forEach(entry => {
+                    content += `Price: $${entry.dataPoint.y.toFixed(2)}<br/>`;
+                    content += `Volume: ${entry.dataPoint.volume.toLocaleString()}<br/>`;
+                });
+                return content;
+            }
+        },
         data: [{
             type: "line",
             markerSize: 0,
@@ -163,9 +186,9 @@ function renderChart(dataPoints, duration) {
     chart.render();
 }
 
-function updateStockDetails(meta) {
+function updateStockDetails(meta, latestData) {
     document.getElementById("symbol").innerText = meta.symbol || "N/A";
-    document.getElementById("price").innerText = meta.currency || "N/A";
+    document.getElementById("price").innerText = latestData ? latestData.y.toFixed(2) : "N/A";
 }
 </script>
 </body>
