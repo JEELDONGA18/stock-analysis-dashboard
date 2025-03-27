@@ -92,71 +92,150 @@
 <script>
 let chart;
 const API_KEY = "e047e2c6b3104488a41cc3cb41f7fcd1"; 
-
 const marketHours = {
-    "NYSE": ["09:30", "16:00"],
-    "NASDAQ": ["09:30", "16:00"],
-    "LSE": ["08:00", "16:30"],
-    "TSE": ["09:00", "15:00"],
-    "NSE": ["09:15", "15:30"],
-    "BSE": ["09:15", "15:30"]
+    "NYSE": { open: "09:30", close: "16:00" },
+    "LSE": { open: "08:00", close: "16:30" },
+    "TSE": { open: "09:00", close: "15:00" },
+    "NSE": { open: "09:15", close: "15:30" }
 };
-
-function getExchange(ticker) {
-    if (ticker.endsWith(".L")) return "LSE";
-    if (ticker.endsWith(".T")) return "TSE";
-    if (ticker.endsWith(".NS")) return "NSE";
-    if (ticker.endsWith(".BO")) return "BSE";
-    return "NYSE";
-}
 
 document.getElementById("stockForm").addEventListener("submit", function(event) {
     event.preventDefault();
     const ticker = document.getElementById("stock-symbol").value.toUpperCase().trim();
     const duration = document.getElementById("period").value;
+    
+    if (ticker === "") {
+        alert("Please enter a stock symbol.");
+        return;
+    }
+    
     fetchStockData(ticker, duration);
 });
 
-function fetchStockData(ticker, duration) {
-    const exchange = getExchange(ticker);
-    const marketStart = marketHours[exchange][0];
-    const marketEnd = marketHours[exchange][1];
-    const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=30min&apikey=${API_KEY}&outputsize=500`;
+async function fetchStockData(ticker, duration) {
+    let interval = getInterval(duration);
+    const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${interval}&apikey=${API_KEY}&outputsize=500`;
+    
+    try {
+        let response = await fetch(url);
+        let data = await response.json();
+        
+        if (!data.values || data.values.length === 0) {
+            alert("No data available for the selected duration.");
+            return;
+        }
+        
+        updateStockDetails(data.meta, data.values[0]);
+        
+        let dataPoints = data.values.map(point => ({
+            x: new Date(point.datetime),
+            y: parseFloat(point.close),
+            open: parseFloat(point.open),
+            high: parseFloat(point.high),
+            low: parseFloat(point.low),
+            close: parseFloat(point.close),
+            volume: parseInt(point.volume)
+        })).reverse();
 
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            let dataPoints = data.values.map(point => {
-                let time = point.datetime.split(" ")[1];
-                return time >= marketStart && time <= marketEnd ? {
-                    x: new Date(point.datetime),
-                    y: parseFloat(point.close),
-                    open: parseFloat(point.open),
-                    high: parseFloat(point.high),
-                    low: parseFloat(point.low),
-                    close: parseFloat(point.close),
-                    volume: parseInt(point.volume)
-                } : null;
-            }).filter(p => p);
+        if (duration === "5D") {
+            dataPoints = filterMarketHours(dataPoints, ticker);
+        }
+        
+        renderChart(dataPoints, duration);
+    } catch (error) {
+        console.error("❌ Error fetching stock data:", error);
+    }
+}
 
-            dataPoints = dataPoints.slice(-5 * (marketEnd - marketStart) / 0.5);
-            renderChart(dataPoints, duration);
-        })
-        .catch(error => console.error("Error fetching stock data:", error));
+function getInterval(duration) {
+    return {
+        "5D": "30min",
+        "1M": "1day",
+        "6M": "1week",
+        "1Y": "15days",
+        "5Y": "1month"
+    }[duration];
+}
+
+function filterMarketHours(dataPoints, ticker) {
+    let market = "NYSE"; // Default to NYSE
+    if (ticker.endsWith(".L")) market = "LSE";
+    if (ticker.endsWith(".T")) market = "TSE";
+    if (ticker.endsWith(".NS")) market = "NSE";
+    
+    const { open, close } = marketHours[market];
+    return dataPoints.filter(point => {
+        let time = point.x.toTimeString().substring(0, 5);
+        return time >= open && time <= close;
+    }).slice(-80); // Last 5 days (assuming ~16 data points per day)
 }
 
 function renderChart(dataPoints, duration) {
     let color = dataPoints[0].y < dataPoints[dataPoints.length - 1].y ? "#FF0000" : "#00FF00";
+    
     chart = new CanvasJS.Chart("chartContainer", {
         backgroundColor: "#1e1e1e",
         animationEnabled: true,
         theme: "dark1",
         title: { text: "Stock Price Chart", fontColor: "white" },
-        axisX: { labelFontColor: "#ffffff" },
+        axisX: {
+            interval: 1,
+            intervalType: duration === "5D" ? "hour" : "day",
+            valueFormatString: duration === "5D" ? "MMM DD HH:mm" : "MMM DD, YYYY",
+            labelFontColor: "#ffffff",
+            labelAngle: -20
+        },
         axisY: { prefix: "$", labelFontColor: "#ffffff" },
-        data: [{ type: "line", color: color, dataPoints: dataPoints }]
+        toolTip: {
+            shared: true,
+            contentFormatter: function (e) {
+                if (e.entries.length > 0) {
+                    let dataPoint = e.entries[0].dataPoint;
+                    let dateTime = dataPoint.x.toLocaleString();
+                    
+                    updateStockDetailsOnHover(dataPoint);
+                    
+                    return duration === "5D" ? 
+                        `<strong>${dateTime}</strong><br>
+                        Open: $${dataPoint.open.toFixed(2)}<br>
+                        High: $${dataPoint.high.toFixed(2)}<br>
+                        Low: $${dataPoint.low.toFixed(2)}<br>
+                        Close: $${dataPoint.close.toFixed(2)}<br>
+                        Volume: ${dataPoint.volume.toLocaleString()}` 
+                        : `<strong>${dateTime.split(",")[0]}</strong><br>Close: $${dataPoint.close.toFixed(2)}`;
+                }
+            }
+        },
+        data: [{
+            type: "line",
+            markerSize: 0,
+            lineThickness: 2,
+            color: color,
+            dataPoints: dataPoints
+        }],
+        creditText: ""
     });
+    
     chart.render();
+}
+
+function updateStockDetails(meta, latestData) {
+    document.getElementById("ticker").innerText = meta.symbol || "N/A";
+    document.getElementById("datetime").innerText = latestData ? new Date(latestData.x).toLocaleString() : "N/A";
+    document.getElementById("open").innerText = latestData ? latestData.open.toFixed(2) : "N/A";
+    document.getElementById("high").innerText = latestData ? latestData.high.toFixed(2) : "N/A";
+    document.getElementById("low").innerText = latestData ? latestData.low.toFixed(2) : "N/A";
+    document.getElementById("close").innerText = latestData ? latestData.close.toFixed(2) : "N/A";
+    document.getElementById("volume").innerText = latestData ? latestData.volume.toLocaleString() : "N/A";
+}
+
+function updateStockDetailsOnHover(dataPoint) {
+    document.getElementById("datetime").innerText = dataPoint.x.toLocaleString();
+    document.getElementById("open").innerText = dataPoint.open.toFixed(2);
+    document.getElementById("high").innerText = dataPoint.high.toFixed(2);
+    document.getElementById("low").innerText = dataPoint.low.toFixed(2);
+    document.getElementById("close").innerText = dataPoint.close.toFixed(2);
+    document.getElementById("volume").innerText = dataPoint.volume.toLocaleString();
 }
 </script>
 </body>
