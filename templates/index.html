@@ -25,6 +25,9 @@
         #chartContainer {
             width: 100%;
             height: 500px;
+            margin: 20px 0;
+            position: relative;
+            border: 1px solid #333;
         }
         .stock-info {
             display: flex;
@@ -112,39 +115,48 @@ document.getElementById("stockForm").addEventListener("submit", function(event) 
     fetchStockData(ticker, duration);
 });
 
-async function fetchStockData(ticker, duration) {
-    let interval = getInterval(duration);
-    const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${interval}&apikey=${API_KEY}&outputsize=500`;
-    
-    try {
-        let response = await fetch(url);
-        let data = await response.json();
-        
-        if (!data.values || data.values.length === 0) {
-            alert("No data available for the selected duration.");
-            return;
-        }
-        
-        updateStockDetails(data.meta, data.values[0]);
-        
-        let dataPoints = data.values.map(point => ({
-            x: new Date(point.datetime),
-            y: parseFloat(point.close),
-            open: parseFloat(point.open),
-            high: parseFloat(point.high),
-            low: parseFloat(point.low),
-            close: parseFloat(point.close),
-            volume: parseInt(point.volume)
-        })).reverse();
+function fetchStockData(ticker, duration) {
+    const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${getInterval(duration)}&apikey=${API_KEY}&outputsize=500`;
 
-        if (duration === "5D") {
-            dataPoints = filterMarketHours(dataPoints, ticker);
-        }
-        
-        renderChart(dataPoints, duration);
-    } catch (error) {
-        console.error("❌ Error fetching stock data:", error);
-    }
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.values || data.values.length === 0) {
+                alert("No data available for the selected duration.");
+                return;
+            }
+
+            updateStockDetails(data.meta, data.values[0]);
+
+            // Create dataPoints array with proper date objects
+            let dataPoints = data.values.map(point => ({
+                x: new Date(point.datetime),
+                y: Number(point.close), // Ensure number conversion
+                open: Number(point.open),
+                high: Number(point.high),
+                low: Number(point.low),
+                close: Number(point.close),
+                volume: Number(point.volume)
+            })).reverse();
+
+            // Filter invalid data points
+            dataPoints = dataPoints.filter(point => 
+                !isNaN(point.y) && 
+                point.x instanceof Date && 
+                !isNaN(point.x)
+            );
+
+            if (dataPoints.length === 0) {
+                alert("No valid data points available.");
+                return;
+            }
+
+            renderChart(dataPoints, duration);
+        })
+        .catch(error => {
+            console.error("Error fetching stock data:", error);
+            alert("Error fetching stock data. Please try again.");
+        });
 }
 
 function getInterval(duration) {
@@ -171,7 +183,11 @@ function filterMarketHours(dataPoints, ticker) {
 }
 
 function renderChart(dataPoints, duration) {
-    let color = dataPoints[0].y < dataPoints[dataPoints.length - 1].y ? "#FF0000" : "#00FF00";
+    if (chart) {
+        chart.destroy();
+    }
+    
+    let color = dataPoints[dataPoints.length - 1].y < dataPoints[0].y ? "#FF0000" : "#00FF00";
     
     chart = new CanvasJS.Chart("chartContainer", {
         backgroundColor: "#1e1e1e",
@@ -216,7 +232,12 @@ function renderChart(dataPoints, duration) {
         creditText: ""
     });
     
-    chart.render();
+    try {
+        chart.render();
+        console.log("Chart rendered successfully");
+    } catch (error) {
+        console.error("Error rendering chart:", error);
+    }
 }
 
 function updateStockDetails(meta, latestData) {
