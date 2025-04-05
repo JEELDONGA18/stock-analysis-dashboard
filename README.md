@@ -27,7 +27,7 @@ Built using:
 |-------------|--------------------------------|
 | Frontend    | HTML, CSS, JavaScript, Chart.js|
 | Backend     | Python, Flask                  |
-| Data Source | Twelve Data API                |
+| Data Source | Alpha Vantage Data API         |
 
 ---
 
