@@ -1,47 +1,35 @@
-# LeetCode Data Fetcher 🧠📊
+# 📊 Stock Market Analysis Dashboard
 
-This Python script allows you to fetch detailed LeetCode user statistics using GraphQL. It collects and organizes valuable insights such as profile information, solved problems, contest history, badges, and language usage—all in one place.
+This project is a **real-time stock analysis dashboard** that lets users search stock symbols and visualize their price history with interactive graphs. It also offers basic forecasting functionality using Python.
+
+Built using:
+- 🐍 Flask (Python backend)
+- 🖥️ HTML + Chart.js (frontend)
+- 🌐 Twelve Data API (real-time stock data)
 
 ---
 
 ## 🚀 Features
 
-✅ **User Profile Details**
-- Username, Real Name, Bio, Country, Global Ranking, and Reputation
-
-✅ **Solved Problems Statistics**
-- Total problems by difficulty (Easy/Medium/Hard)
-- Accepted submissions by difficulty
-
-✅ **Topic-wise Problem Solving Stats**
-- Solved problems categorized by:
-  - Fundamental
-  - Intermediate
-  - Advanced
-
-✅ **Contest Participation History**
-- Total contests participated
-- Current rating
-- Global ranking
-- Top percentage
-- Full contest history (title, time, score, rank, etc.)
-
-✅ **Badges Earned**
-- List of earned badges with:
-  - Name, Display Name, Short Name, Creation Date, ID
-
-✅ **Language-wise Problem Stats**
-- Problems solved per programming language
-
-🔄 **Central Data Aggregator**
-- `fetch_all_leetcode_data(username)` function (assumed)
-- Aggregates all of the above into one structured dataset (likely JSON)
+✅ **User-Friendly Search Interface**  
+✅ **Historical Price Visualization** (Line/Candlestick Chart)  
+✅ **Duration Selection** – View data from 7 Days to 2 Years  
+✅ **Forecast Future Prices** (basic simulated logic)  
+✅ **Dynamic Interval Handling** (based on time range)  
+✅ **Interactive UI with Date-FNS + Chart.js plugins**  
+✅ **Dark Mode Design**
 
 ---
 
-## 🛠️ Requirements
+## 🧠 Tech Stack
 
-Install dependencies using pip:
+| Layer       | Tools                          |
+|-------------|--------------------------------|
+| Frontend    | HTML, CSS, JavaScript, Chart.js|
+| Backend     | Python, Flask                  |
+| Data Source | Twelve Data API                |
 
-```bash
-pip install -r requirements.txt
+---
+
+## 📁 Project Structure
+
